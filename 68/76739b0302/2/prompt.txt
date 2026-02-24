@@ -1,0 +1,5 @@
+Create a Makefile including the commands make start make stop and make cli. make start should fire up a jupyter notebook in which Hugginface models are downloaded and invoked or Claude Opus 4.6 is inferred. For that, create a .env file, add it to .gitignore, and ask the user during make start to add their HF and Claude keys. Model provider, model and a URL should be parameterizable. The URL would be a link to a documentation page from which I want the notebook or the LLM respectively to generate a python-based CLI tool from. CLI tools should be saved in cli/domain-name/model-name.
+
+---
+
+Setup should check if Python and the pip dependencies are installed. There should also be a check, if Mac is used. If so, create a venv.
