@@ -1,0 +1,5 @@
+Make install should also setup Mlflow. Running 0_generate_cli should be logged in mflow.
+
+---
+
+Make start should start jupyter and Mlflow. Make install should install all the required dependenies.
