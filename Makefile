@@ -18,8 +18,8 @@ help:
 	@echo ""
 	@echo "Usage:"
 	@echo "  make install                       Set up Python, install deps, configure API keys"
-	@echo "  make start                         Start Jupyter and open it in the browser"
-	@echo "  make stop                          Stop the Jupyter server"
+	@echo "  make start                         Start Jupyter and MLflow, open in browser"
+	@echo "  make stop                          Stop Jupyter and MLflow"
 	@echo "  make cli URL=https://...           Generate a Python CLI from a docs URL"
 	@echo ""
 	@echo "Parameters for make cli (with defaults):"
@@ -40,32 +40,46 @@ install:
 	@chmod +x scripts/setup.sh
 	@bash scripts/setup.sh
 	@echo ""
-	@echo "All done. Run 'make start' to launch Jupyter."
+	@echo "All done. Run 'make start' to launch Jupyter and MLflow."
 
 # ── start ─────────────────────────────────────────────────────────────────────
-## Launch Jupyter in the background and open it in your default browser.
+## Launch Jupyter and MLflow in the background and open them in your browser.
 start:
 	@[ -f .env ] || { echo "Run 'make install' first to install dependencies and configure API keys."; exit 1; }
 	@mkdir -p notebooks
 	@set -a && . ./.env && set +a && \
 	  nohup jupyter notebook --port $(JUPYTER_PORT) --notebook-dir notebooks > .jupyter.log 2>&1 & echo $$! > .jupyter.pid
-	@echo "Jupyter starting on port $(JUPYTER_PORT) … (log: .jupyter.log)"
+	@echo "Jupyter  : starting on port $(JUPYTER_PORT) … (log: .jupyter.log)"
+	@set -a && . ./.env && set +a && \
+	  nohup mlflow server --host 127.0.0.1 --port 5000 > .mlflow.log 2>&1 & echo $$! > .mlflow.pid
+	@echo "MLflow   : starting at http://127.0.0.1:5000 … (log: .mlflow.log)"
 	@sleep 2
 	@open http://localhost:$(JUPYTER_PORT) 2>/dev/null || \
 	  xdg-open http://localhost:$(JUPYTER_PORT) 2>/dev/null || \
 	  echo "Open http://localhost:$(JUPYTER_PORT) in your browser."
+	@open http://127.0.0.1:5000 2>/dev/null || \
+	  xdg-open http://127.0.0.1:5000 2>/dev/null || true
 
 # ── stop ──────────────────────────────────────────────────────────────────────
-## Stop the Jupyter server.
+## Stop Jupyter and MLflow servers.
 stop:
 	@PID=""; \
 	[ -f .jupyter.pid ] && PID=$$(cat .jupyter.pid); \
 	if [ -n "$$PID" ] && kill "$$PID" 2>/dev/null; then \
-	  echo "Jupyter stopped (PID $$PID)."; rm -f .jupyter.pid; \
+	  echo "Jupyter  : stopped (PID $$PID)."; rm -f .jupyter.pid; \
 	elif pkill -f "jupyter.*notebook" 2>/dev/null; then \
-	  echo "Jupyter process killed."; rm -f .jupyter.pid; \
+	  echo "Jupyter  : process killed."; rm -f .jupyter.pid; \
 	else \
-	  echo "No Jupyter server found."; \
+	  echo "Jupyter  : no server found."; \
+	fi
+	@PID=""; \
+	[ -f .mlflow.pid ] && PID=$$(cat .mlflow.pid); \
+	if [ -n "$$PID" ] && kill "$$PID" 2>/dev/null; then \
+	  echo "MLflow   : stopped (PID $$PID)."; rm -f .mlflow.pid; \
+	elif pkill -f "mlflow.*server" 2>/dev/null; then \
+	  echo "MLflow   : process killed."; rm -f .mlflow.pid; \
+	else \
+	  echo "MLflow   : no server found."; \
 	fi
 
 # ── cli ───────────────────────────────────────────────────────────────────────
@@ -83,7 +97,7 @@ endif
 	@echo ""
 	@set -a && . ./.env && set +a && \
 	  PROVIDER=$(PROVIDER) MODEL=$(MODEL) URL=$(URL) \
-	  papermill notebooks/generate_cli.ipynb \
+	  papermill notebooks/0_generate_cli.ipynb \
 	    /tmp/cli_out_$$(date +%s).ipynb \
 	    -p PROVIDER "$(PROVIDER)" \
 	    -p MODEL    "$(MODEL)" \
