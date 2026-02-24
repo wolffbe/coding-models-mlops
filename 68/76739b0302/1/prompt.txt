@@ -1,0 +1,5 @@
+Make install should setup python, install dependencies, install jupyter, and       
+  let the user add the keys to huggingface and claude. The notebooks folder          
+  should exist anyway as we will be adding notebooks later. Make start should        
+  then fire up the jupyter server, and open jupyter in a browser. make stop          
+  should shut everything down.
