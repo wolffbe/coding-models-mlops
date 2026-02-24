@@ -1,0 +1,28 @@
+{
+  "cli_version": "0.4.6",
+  "checkpoint_id": "6876739b0302",
+  "strategy": "manual-commit",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "Makefile",
+    "generate_cli.ipynb",
+    "scripts/setup.sh"
+  ],
+  "sessions": [
+    {
+      "metadata": "/68/76739b0302/0/metadata.json",
+      "transcript": "/68/76739b0302/0/full.jsonl",
+      "context": "/68/76739b0302/0/context.md",
+      "content_hash": "/68/76739b0302/0/content_hash.txt",
+      "prompt": "/68/76739b0302/0/prompt.txt"
+    }
+  ],
+  "token_usage": {
+    "input_tokens": 8,
+    "cache_creation_tokens": 9266,
+    "cache_read_tokens": 148592,
+    "output_tokens": 486,
+    "api_call_count": 6
+  }
+}

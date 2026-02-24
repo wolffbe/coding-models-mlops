@@ -1,0 +1,1 @@
+It should not be possible to skip entering huggingface or claude keys. The default folder in jupyter should be notebooks
