@@ -1,0 +1,644 @@
+Implement the following plan:
+
+# Plan: Python Poetry Monorepo
+
+## Context
+
+The existing repo (`coding-agents-mlops`) is a base system that generates CLI tools from documentation URLs. The monorepo overlay should support two categories of Python packages:
+
+- **`cli/<name>/`** — generated CLI packages (output of the CLI generator notebook)
+- **`packages/<name>/`** — system-level packages written to control/extend the base system
+
+Each package is a fully independent Poetry package (its own `pyproject.toml` + `poetry.lock`).
+The root `pyproject.toml` is a non-publishable dev-tooling anchor only.
+The existing `requirements.txt` + `.venv` setup for Jupyter/MLflow infra is left untouched.
+
+---
+
+## Files to Create / Modify
+
+### 1. `pyproject.toml` (new, root)
+
+```toml
+[tool.poetry]
+name = "coding-agents-mlops-root"
+version = "0.0.0"
+description = "Root dev-tooling anchor for the monorepo. Not a publishable package."
+authors = []
+packages = []
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+ruff  = "^0.4"
+
+[build-system]
+requires      = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+```
+
+`packages = []` is the critical guard — prevents Poetry from treating the root as a publishable package.
+
+---
+
+### 2. `packages/.gitkeep` (new, empty)
+
+Anchors the `packages/` directory in git before any real package exists.
+
+---
+
+### 3. `.gitignore` additions
+
+```gitignore
+# Per-package build artifacts
+packages/*/dist/
+packages/*/.venv/
+packages/*/.python-version
+cli/*/dist/
+cli/*/.venv/
+cli/*/.python-version
+```
+
+---
+
+### 4. `.github/workflows/ci.yml` (new)
+
+Two jobs:
+
+**`detect-changes`**: Diffs against the PR base SHA (or `HEAD~1` for push to main), extracts unique `cli/<name>` and `packages/<name>` paths from changed files, outputs a JSON matrix.
+
+**`test-package`**: Runs only if `has_changes == true`. Uses the matrix to run, per changed package:
+- `poetry install`
+- `poetry run ruff check .`
+- `poetry run pytest --tb=short -q`
+
+Uses `snok/install-poetry@v1` (standard community action), `virtualenvs-in-project: true` for deterministic cache paths, and `fail-fast: false` so one failing package doesn't cancel others.
+
+```yaml
+name: Package CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  detect-changes:
+    name: Detect changed packages
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build-matrix.outputs.matrix }}
+      has_changes: ${{ steps.build-matrix.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Determine base SHA
+        id: base-sha
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse --root HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build matrix
+        id: build-matrix
+        run: |
+          BASE="${{ steps.base-sha.outputs.sha }}"
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+          PACKAGES=$(echo "$CHANGED" \
+            | grep -E '^(cli|packages)/[^/]+/' \
+            | sed -E 's|^((cli|packages)/[^/]+)/.*|\1|' \
+            | sort -u)
+          if [ -z "$PACKAGES" ]; then
+            echo "matrix=[]" >> "$GITHUB_OUTPUT"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            JSON=$(echo "$PACKAGES" | jq -R . | jq -sc .)
+            echo "matrix=$JSON" >> "$GITHUB_OUTPUT"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  test-package:
+    name: Test ${{ matrix.package }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: snok/install-poetry@v1
+        with:
+          version: "1.8.3"
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - uses: actions/cache@v4
+        with:
+          path: ${{ matrix.package }}/.venv
+          key: ${{ runner.os }}-poetry-${{ matrix.package }}-${{ hashFiles(format('{0}/poetry.lock', matrix.package)) }}
+          restore-keys: ${{ runner.os }}-poetry-${{ matrix.package }}-
+      - name: Install deps
+        working-directory: ${{ matrix.package }}
+        run: poetry install --no-interaction
+      - name: Ruff lint
+        working-directory: ${{ matrix.package }}
+        run: poetry run ruff check .
+      - name: Run tests
+        working-directory: ${{ matrix.package }}
+        run: poetry run pytest --tb=short -q
+```
+
+---
+
+### 5. `Makefile` modifications
+
+Update `.PHONY` line to add `pkg-new cli-new pkg-test`.
+
+Update `help` target to document the three new targets.
+
+Append three new targets:
+
+```makefile
+# ── pkg-new ───────────────────────────────────────────────────────────────────
+## Scaffold a new system package in packages/<name>/
+## Usage: make pkg-new NAME=mypackage
+pkg-new:
+ifndef NAME
+	$(error NAME is required. Usage: make pkg-new NAME=mypackage)
+endif
+	@echo "$(NAME)" | grep -qE '^[a-z][a-z0-9_]*$$' || \
+	  { echo "NAME must be a lowercase Python identifier (letters, digits, underscores)."; exit 1; }
+	@PKG_DIR="packages/$(NAME)"; \
+	[ -d "$$PKG_DIR" ] && { echo "Error: $$PKG_DIR already exists."; exit 1; } || true; \
+	mkdir -p "$$PKG_DIR/src/$(NAME)" "$$PKG_DIR/tests"; \
+	touch "$$PKG_DIR/src/$(NAME)/__init__.py" "$$PKG_DIR/tests/__init__.py"; \
+	printf 'def test_placeholder():\n    pass\n' > "$$PKG_DIR/tests/test_$(NAME).py"; \
+	printf '[tool.poetry]\nname = "$(NAME)"\nversion = "0.1.0"\ndescription = ""\nreadme = "README.md"\npackages = [{include = "$(NAME)", from = "src"}]\n\n[tool.poetry.dependencies]\npython = "^3.11"\n\n[tool.poetry.group.dev.dependencies]\npytest = "^8.0"\nruff = "^0.4"\n\n[build-system]\nrequires = ["poetry-core"]\nbuild-backend = "poetry.core.masonry.api"\n' \
+	  > "$$PKG_DIR/pyproject.toml"; \
+	echo "Scaffolded: $$PKG_DIR"
+
+# ── cli-new ───────────────────────────────────────────────────────────────────
+## Scaffold a new generated CLI package in cli/<name>/
+## Usage: make cli-new NAME=mycli
+cli-new:
+ifndef NAME
+	$(error NAME is required. Usage: make cli-new NAME=mycli)
+endif
+	@echo "$(NAME)" | grep -qE '^[a-z][a-z0-9_]*$$' || \
+	  { echo "NAME must be a lowercase Python identifier (letters, digits, underscores)."; exit 1; }
+	@PKG_DIR="cli/$(NAME)"; \
+	[ -d "$$PKG_DIR" ] && { echo "Error: $$PKG_DIR already exists."; exit 1; } || true; \
+	mkdir -p "$$PKG_DIR/src/$(NAME)" "$$PKG_DIR/tests"; \
+	touch "$$PKG_DIR/src/$(NAME)/__init__.py" "$$PKG_DIR/tests/__init__.py"; \
+	printf 'def test_placeholder():\n    pass\n' > "$$PKG_DIR/tests/test_$(NAME).py"; \
+	printf '[tool.poetry]\nname = "$(NAME)"\nversion = "0.1.0"\ndescription = ""\nreadme = "README.md"\npackages = [{include = "$(NAME)", from = "src"}]\n\n[tool.poetry.dependencies]\npython = "^3.11"\n\n[tool.poetry.group.dev.dependencies]\npytest = "^8.0"\nruff = "^0.4"\n\n[build-system]\nrequires = ["poetry-core"]\nbuild-backend = "poetry.core.masonry.api"\n' \
+	  > "$$PKG_DIR/pyproject.toml"; \
+	echo "Scaffolded: $$PKG_DIR"
+
+# ── pkg-test ──────────────────────────────────────────────────────────────────
+## Run tests for one package or all packages.
+## Usage: make pkg-test NAME=mypackage   (single)
+##        make pkg-test                  (all)
+pkg-test:
+ifdef NAME
+	@cd "packages/$(NAME)" && poetry install --quiet && poetry run pytest --tb=short -q
+else
+	@FAILED=""; \
+	for dir in packages/*/ cli/*/; do \
+	  [ -f "$$dir/pyproject.toml" ] || continue; \
+	  echo "── Testing: $$dir"; \
+	  (cd "$$dir" && poetry install --quiet && poetry run pytest --tb=short -q) \
+	    || FAILED="$$FAILED $$dir"; \
+	done; \
+	[ -z "$$FAILED" ] && echo "All packages passed." || { echo "FAILED:$$FAILED"; exit 1; }
+endif
+```
+
+---
+
+## Resulting Directory Structure
+
+```
+coding-agents-mlops/
+├── cli/                           # generated packages (existing dir, now contains Poetry pkgs)
+│   └── <name>/                   # created by cli-new or CLI generator
+│       ├── pyproject.toml
+│       ├── src/<name>/__init__.py
+│       └── tests/
+├── packages/                      # system-level packages
+│   ├── .gitkeep                   # NEW
+│   └── <name>/                   # created by pkg-new
+│       ├── pyproject.toml
+│       ├── src/<name>/__init__.py
+│       └── tests/
+├── pyproject.toml                 # NEW — root dev-tooling anchor
+├── .github/
+│   └── workflows/
+│       └── ci.yml                 # NEW — per-package CI
+├── Makefile                       # MODIFIED
+├── .gitignore                     # MODIFIED
+└── ... (all existing files unchanged)
+```
+
+---
+
+## Verification
+
+```bash
+# 1. Validate root Poetry config
+poetry check
+
+# 2. Scaffold and test a system package
+make pkg-new NAME=example
+make pkg-test NAME=example
+
+# 3. Scaffold a CLI package
+make cli-new NAME=mycli
+ls cli/mycli/
+
+# 4. Push a branch modifying cli/mycli/ → GitHub Actions runs only the mycli job
+```
+
+
+If you need specific details from before exiting plan mode (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/wolffbe/.claude/projects/-Users-wolffbe-workspace-coding-agents-mlops/abf82663-609c-4c05-9fb4-3ca207c2412a.jsonl
+
+---
+
+Remove the make commands to generate new system packages. Add .entire to .gitignore.
+
+---
+
+make install should install vllm, kserve, jupyter and mlflow
+
+---
+
+Follow the steps given in this tutorial: https://medium.com/@rohitkhatana/installing-vllm-on-macos-a-step-by-step-guide-bbbf673461af
+
+---
+
+[Request interrupted by user for tool use]
+
+---
+
+Installing vLLM on macOS: A Step-by-Step Guide
+Rohit Khatana
+Rohit Khatana
+5 min read
+·
+Mar 14, 2025
+
+vLLM is a powerful LLM inference and serving engine that enhances inference speed and throughput through PagedAttention, an optimized attention mechanism. While vLLM is primarily designed for CUDA-enabled hardware, it’s possible to get it running on macOS with some workarounds. This guide will walk you through the installation process and some basic usage examples.
+The CUDA Challenge on macOS
+
+The first thing to understand is that direct pip installation will not work on macOS. When you try, you’ll likely encounter an error like this:
+
+RuntimeError: Cannot find CUDA_HOME. CUDA must be available in order to build the package.
+
+This happens because vLLM’s default installation requires CUDA, which is not available on macOS (Apple uses Metal instead). We’ll need to use alternative approaches.
+Prerequisites
+
+Before starting, make sure you have the following:
+
+    A macOS system (preferably with an Apple Silicon chip for better performance)
+    Python 3.8 or newer
+    Pip package manager (or preferably uv for faster installations)
+    Git
+    Homebrew (optional but recommended)
+    Basic familiarity with command line operations
+
+Step-by-Step Installation Guide for macOS
+
+Here’s the complete workflow that has been tested and confirmed to work on macOS:
+
+    Create and activate a virtual environment:
+
+python -m venv vllm_env
+source vllm_env/bin/activate
+
+2. Clone the vLLM repository:
+
+git clone https://github.com/vllm-project/vllm.git
+cd vllm
+
+3. Install PyTorch with MPS (Metal Performance Shaders) support:
+
+pip install torch torchvision
+
+4. Install vLLM:
+
+# Direct installation - might work on some systems without additional flags
+pip install -e .
+# If direct installation fails with CUDA errors, use these environment variables
+# to bypass CUDA requirements (optional but often necessary):
+export VLLM_TARGET_DEVICE=cpu
+export VLLM_BUILD_WITH_CUDA=0
+pip install -e .
+
+5. Critical step for Python imports: After installation, the vLLM command-line interface might work, but importing in Python scripts often fails. To fix this, you’ll need to add the installation path to your Python script:
+
+import sys
+import os
+# Get directory path where vllm is installed
+# You can find this with `which vllm` in terminal
+vllm_path = "/path/to/vllm"  # Replace with actual path from `which vllm`
+sys.path.append(os.path.dirname(vllm_path))
+# Now imports should work
+from vllm import LLM, SamplingParams
+
+This path-appending solution ensures Python can find the vLLM module correctly.
+Using vLLM on macOS
+
+After installation and path configuration, you can start using vLLM with smaller models. Here’s a complete example:
+
+import sys
+import os
+
+# Add vLLM installation path
+vllm_path = "/path/to/vllm"  # Use path from `which vllm`
+sys.path.append(os.path.dirname(vllm_path))
+# Import vLLM components
+from vllm import LLM, SamplingParams
+import torch
+# Check for MPS availability
+use_mps = torch.backends.mps.is_available()
+device_type = "mps" if use_mps else "cpu"
+print(f"Using device: {device_type}")
+# Initialize the LLM with a small model
+llm = LLM(model="TinyLlama/TinyLlama-1.1B-Chat-v1.0", 
+          download_dir="./models",
+          tensor_parallel_size=1,
+          trust_remote_code=True,
+          dtype="float16" if use_mps else "float32")
+# Set sampling parameters
+sampling_params = SamplingParams(temperature=0.7, top_p=0.95, max_tokens=100)
+# Generate text
+prompt = "Write a short poem about artificial intelligence."
+outputs = llm.generate([prompt], sampling_params)
+# Print the result
+for output in outputs:
+    print(output.outputs[0].text)
+
+Running the vLLM Server
+
+You can also run vLLM as a server on macOS:
+
+VLLM_USE_CUDA=0 python -m vllm.entrypoints.api_server \
+    --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
+    --tensor-parallel-size 1 \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --dtype float16
+
+Once running, you can send requests to the API:
+
+import requests
+response = requests.post(
+    "http://localhost:8000/generate",
+    json={
+        "prompt": "What is artificial intelligence?",
+        "max_tokens": 100,
+        "temperature": 0.7,
+    },
+)
+print(response.json())
+
+Troubleshooting Import Issues
+
+The most common issue with vLLM on macOS is the import error even after successful installation. Here are strategies to resolve it:
+Finding the Correct Path
+
+The first step is to locate where vLLM is actually installed:
+
+# Find where the vllm command is installed
+which vllm
+# This will return something like /path/to/python/bin/vllm
+# The parent directory of this path is what you need for sys.path.append()
+
+Testing Multiple Approaches
+
+If you’re still having issues:
+
+    Try installing with the --user flag:
+
+pip install --user -e 
+
+2. Verify that the CLI works:
+
+vllm --help
+
+3. Add multiple potential paths:
+
+import sys
+import os
+
+# Try adding both potential paths
+vllm_cli_path = "/path/to/vllm/bin/vllm"  # From which vllm
+sys.path.append(os.path.dirname(os.path.dirname(vllm_cli_path)))
+sys.path.append(os.getcwd())  # If running from vllm directory
+
+# Now try importing
+from vllm import LLM
+
+Using vLLM on macOS
+
+After installation, you can start using vLLM with some modifications for macOS. Here’s how to load a model and run inference:
+Basic Example
+
+from vllm import LLM, SamplingParams
+import torch
+# Check for MPS availability
+use_mps = torch.backends.mps.is_available()
+device_type = "mps" if use_mps else "cpu"
+print(f"Using device: {device_type}")
+# Initialize the LLM
+# Note: For macOS, you'll want to use smaller models
+llm = LLM(model="TinyLlama/TinyLlama-1.1B-Chat-v1.0", 
+           download_dir="./models",
+           tensor_parallel_size=1,
+           trust_remote_code=True,
+           dtype="float16" if use_mps else "float32")
+# Set sampling parameters
+sampling_params = SamplingParams(temperature=0.7, top_p=0.95, max_tokens=100)
+# Generate text
+prompt = "Write a short poem about artificial intelligence."
+outputs = llm.generate([prompt], sampling_params)
+# Print the result
+for output in outputs:
+    print(output.outputs[0].text)
+
+Running the vLLM Server
+
+You can also run vLLM as a server on macOS with some modifications:
+
+VLLM_USE_CUDA=0 python -m vllm.entrypoints.api_server \
+    --model TinyLlama/TinyLlama-1.1B-Chat-v1.0 \
+    --tensor-parallel-size 1 \
+    --host 0.0.0.0 \
+    --port 8000 \
+    --dtype float16
+
+Once running, you can send requests to the API:
+
+import requests
+
+response = requests.post(
+    "http://localhost:8000/generate",
+    json={
+        "prompt": "What is artificial intelligence?",
+        "max_tokens": 100,
+        "temperature": 0.7,
+    },
+)
+print(response.json())
+
+Performance Considerations on macOS
+
+When running vLLM on macOS, keep in mind:
+
+    Limited acceleration: Without CUDA, performance will be significantly slower than on NVIDIA GPUs
+    Memory limitations: Most consumer Macs have less RAM than dedicated servers, so use smaller models
+    Model size: Start with very small models like TinyLlama (1–2B parameters)
+    Quantization: Use 4-bit or 8-bit quantized models when possible for better performance
+    MPS limitations: MPS support in PyTorch is still evolving and may have limitations
+
+Alternative Libraries for macOS
+
+If vLLM proves too challenging or too slow, consider these alternatives that work better on macOS:
+
+    llama.cpp: Well-optimized for CPU and Metal on macOS
+    CTransformers: Lightweight CPU inference
+    MLC LLM: Specifically designed to leverage Apple Silicon
+
+Uninstalling vLLM
+
+If you need to start fresh, uninstall vLLM completely:
+
+# Uninstall the package
+pip uninstall vllm -y
+# Clean up build artifacts
+rm -rf build/
+rm -rf vllm.egg-info/
+rm -rf .deps/
+
+Conclusion
+
+Installing vLLM on macOS requires working around CUDA dependencies, with the critical step of adding the installation path to your Python imports. While this makes it usable for development and testing, performance will be limited compared to CUDA systems.
+Get Rohit Khatana’s stories in your inbox
+
+Join Medium for free to get updates from this writer.
+
+The key takeaways are:
+
+    Set environment variables VLLM_TARGET_DEVICE=cpu and VLLM_BUILD_WITH_CUDA=0 during installation
+    Use the sys.path.append() technique to ensure Python can find the vLLM module
+    Start with small models like TinyLlama for testing
+    Consider alternatives like llama.cpp if performance is critical
+
+By following this guide, you can successfully run vLLM on macOS for development purposes, while understanding its limitations on this platform.
+
+---
+
+Remove the thin setup.sh. Make sure that make install uses one script per function: vllm, jupyter, mlflow, kserve.
+
+---
+
+Knative mode Installation Guide
+
+KServe's Knative serverless deployment mode leverages Knative to provide autoscaling based on request volume and supports scale down to and from zero. It also supports revision management and canary rollout based on revisions.
+
+This mode is particularly useful for:
+
+    Cost optimization by automatically scaling resources based on demand
+    Environments with varying or unpredictable traffic patterns
+    Burst traffic scenarios where rapid scaling is required
+    Scenarios where resources should be freed when not in use
+    Managing multiple model revisions and canary deployments
+
+Applicability for Predictive Inference
+
+Knative deployment is particularly well-suited for predictive inference workloads because:
+
+    Predictive inference typically has shorter response times that work well with Knative's concurrency model
+    CPU-based models can efficiently scale to zero when not in use
+    Knative's request-based scaling aligns with the traffic patterns of many predictive workloads
+    Canary deployments and revisions enable safe updates to predictive models
+
+info
+
+Knative serverless Deployment is recommended primarily for predictive inference workloads.
+
+For generative inference workloads that typically require GPU resources and have longer processing times, the Standard Kubernetes Deployment approach is recommended.
+
+Kubernetes 1.32 is the minimally required version and please check the following recommended Knative, Istio versions for the corresponding Kubernetes version.
+Recommended Version Matrix
+Kubernetes Version    Recommended Istio Version    Recommended Knative Version
+1.32    1.27,1.28    1.19,1.20
+1.33    1.27,1.28    1.19,1.20
+1.34    1.28    1.19,1.20
+1. Install Knative Serving
+
+Please refer to Knative Serving install guide.
+tip
+
+If you are looking to use PodSpec fields such as nodeSelector, affinity or tolerations which are now supported in the v1beta1 API spec, you need to turn on the corresponding feature flags in your Knative configuration.
+warning
+
+Knative 1.13.1 requires Istio 1.20+, gRPC routing does not work with previous Istio releases, see release notes.
+2. Install Networking Layer
+
+The recommended networking layer for KServe is Istio as currently it works best with KServe, please refer to the Istio install guide. Alternatively you can also choose other networking layers like Kourier or Contour, see how to install Kourier with KServe guide.
+3. Install Cert Manager
+
+The minimally required Cert Manager version is 1.15.0 and you can refer to Cert Manager.
+note
+
+Cert manager is required to provision webhook certs for production grade installation, alternatively you can run self signed certs generation script.
+4. Install KServe
+Install using Helm
+
+Install KServe CRDs
+
+helm install kserve-crd oci://ghcr.io/kserve/charts/kserve-crd --version v0.16.0
+
+Install KServe Resources
+
+helm install kserve oci://ghcr.io/kserve/charts/kserve --version v0.16.0
+
+Install using YAML
+
+Install KServe CRDs and Controller, --server-side option is required as the InferenceService CRD is large, see this issue for details.
+
+kubectl apply --server-side -f https://github.com/kserve/kserve/releases/download/v0.16.0/kserve.yaml
+
+Install KServe Built-in ClusterServingRuntimes
+
+kubectl apply --server-side -f https://github.com/kserve/kserve/releases/download/v0.16.0/kserve-cluster-resources.yaml
+
+note
+
+ClusterServingRuntimes are required to create InferenceService for built-in model serving runtimes with KServe v0.8.0 or higher.
+
+---
+
+I want to be able to run make cli after make install. Make cli should take three parameters and load a file. The parameters are model-provider (huggingface or anthropic), model name and docs-url, which points to a documentation online. The goal is that the system automatically downloads a given model or uses anthropics inference, and then creates a CLI from a Python SDK that I provide via the docs-url. The newly created cli should be saved as a package in the repository.
+
+---
+
+I would like to specify the prompt in 0_generate_cli in an extra folder named /prompts. The prompt needs to get injected while firing up the jupyter server in K8s.
+
+---
+
+Safely remove setup_kserve.sh
