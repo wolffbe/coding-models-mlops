@@ -1,0 +1,32 @@
+{
+  "cli_version": "0.4.6",
+  "checkpoint_id": "a77c6fb97499",
+  "session_id": "1d798ce6-ba71-4e5c-9b1c-e08361e29129",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-25T09:04:22.926191Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "scripts/setup.sh",
+    "scripts/setup_jupyter.sh",
+    "scripts/setup_mlflow.sh"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "c790c35e3890",
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 21213,
+    "cache_read_tokens": 242342,
+    "output_tokens": 4620,
+    "api_call_count": 10
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-25T09:04:22.872067Z",
+    "agent_lines": 133,
+    "human_added": 179,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 312,
+    "agent_percentage": 42.628205128205124
+  }
+}
