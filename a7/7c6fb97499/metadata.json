@@ -3,8 +3,9 @@
   "checkpoint_id": "a77c6fb97499",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 1,
+  "checkpoints_count": 2,
   "files_touched": [
+    "notebooks/0_generate_cli.ipynb",
     "scripts/setup.sh",
     "scripts/setup_jupyter.sh",
     "scripts/setup_mlflow.sh"
@@ -16,13 +17,20 @@
       "context": "/a7/7c6fb97499/0/context.md",
       "content_hash": "/a7/7c6fb97499/0/content_hash.txt",
       "prompt": "/a7/7c6fb97499/0/prompt.txt"
+    },
+    {
+      "metadata": "/a7/7c6fb97499/1/metadata.json",
+      "transcript": "/a7/7c6fb97499/1/full.jsonl",
+      "context": "/a7/7c6fb97499/1/context.md",
+      "content_hash": "/a7/7c6fb97499/1/content_hash.txt",
+      "prompt": "/a7/7c6fb97499/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 12,
-    "cache_creation_tokens": 21213,
-    "cache_read_tokens": 242342,
-    "output_tokens": 4620,
-    "api_call_count": 10
+    "input_tokens": 52,
+    "cache_creation_tokens": 64736,
+    "cache_read_tokens": 1661689,
+    "output_tokens": 9479,
+    "api_call_count": 46
   }
 }
