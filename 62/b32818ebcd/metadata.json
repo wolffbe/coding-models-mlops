@@ -3,7 +3,7 @@
   "checkpoint_id": "62b32818ebcd",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 13,
+  "checkpoints_count": 15,
   "files_touched": [
     ".github/workflows/ci.yml",
     ".gitignore",
@@ -18,14 +18,17 @@
     "k8s/namespace.yaml",
     "k8s/prompts-configmap.yaml",
     "k8s/secret.example.yaml",
+    "k8s/vllm/inferenceservice.yaml",
     "notebooks/0_generate_cli.ipynb",
     "packages/.gitkeep",
     "prompts/cli_generation.txt",
     "pyproject.toml",
     "requirements.txt",
     "scripts/setup.sh",
+    "scripts/setup_env.sh",
     "scripts/setup_jupyter.sh",
     "scripts/setup_kserve_knative.sh",
+    "scripts/setup_minikube.sh",
     "scripts/setup_vllm.sh"
   ],
   "sessions": [
@@ -63,13 +66,20 @@
       "context": "/62/b32818ebcd/4/context.md",
       "content_hash": "/62/b32818ebcd/4/content_hash.txt",
       "prompt": "/62/b32818ebcd/4/prompt.txt"
+    },
+    {
+      "metadata": "/62/b32818ebcd/5/metadata.json",
+      "transcript": "/62/b32818ebcd/5/full.jsonl",
+      "context": "/62/b32818ebcd/5/context.md",
+      "content_hash": "/62/b32818ebcd/5/content_hash.txt",
+      "prompt": "/62/b32818ebcd/5/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 3063,
-    "cache_creation_tokens": 140740,
-    "cache_read_tokens": 5284853,
-    "output_tokens": 31464,
-    "api_call_count": 114
+    "input_tokens": 3119,
+    "cache_creation_tokens": 204418,
+    "cache_read_tokens": 8265867,
+    "output_tokens": 44760,
+    "api_call_count": 166
   }
 }

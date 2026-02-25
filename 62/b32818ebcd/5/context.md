@@ -1,0 +1,12 @@
+# Session Context
+
+## User Prompts
+
+### Prompt 1
+
+If I'm running make install on macOS, make sure a minkube instance exists, if not, create one, and deploy kserve, vllm, knative, and pods for mlflow and jupyter
+
+### Prompt 2
+
+I would prefer each tool used in setup_k8s_deploy.sh to use its own setup bash script. Also, remove any notion of local deployment. I want all tools to run inside of Kubernetes, i.e. as I'm running on Mac, my minikube instance. Rename the minikube profile to coding-agents-mlops.
+
