@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mlflow
+  namespace: mlops
+spec:
+  selector:
+    app: mlflow
+  type: NodePort
+  ports:
+    - name: tracking
+      port: 5000
+      targetPort: 5000
+      nodePort: 30500

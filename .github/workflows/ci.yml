@@ -1,0 +1,78 @@
+name: Package CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  detect-changes:
+    name: Detect changed packages
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build-matrix.outputs.matrix }}
+      has_changes: ${{ steps.build-matrix.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Determine base SHA
+        id: base-sha
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "sha=${{ github.event.pull_request.base.sha }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=$(git rev-parse HEAD~1 2>/dev/null || git rev-parse --root HEAD)" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Build matrix
+        id: build-matrix
+        run: |
+          BASE="${{ steps.base-sha.outputs.sha }}"
+          CHANGED=$(git diff --name-only "$BASE" HEAD)
+          PACKAGES=$(echo "$CHANGED" \
+            | grep -E '^(cli|packages)/[^/]+/' \
+            | sed -E 's|^((cli|packages)/[^/]+)/.*|\1|' \
+            | sort -u)
+          if [ -z "$PACKAGES" ]; then
+            echo "matrix=[]" >> "$GITHUB_OUTPUT"
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+          else
+            JSON=$(echo "$PACKAGES" | jq -R . | jq -sc .)
+            echo "matrix=$JSON" >> "$GITHUB_OUTPUT"
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  test-package:
+    name: Test ${{ matrix.package }}
+    needs: detect-changes
+    if: needs.detect-changes.outputs.has_changes == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package: ${{ fromJson(needs.detect-changes.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - uses: snok/install-poetry@v1
+        with:
+          version: "1.8.3"
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+      - uses: actions/cache@v4
+        with:
+          path: ${{ matrix.package }}/.venv
+          key: ${{ runner.os }}-poetry-${{ matrix.package }}-${{ hashFiles(format('{0}/poetry.lock', matrix.package)) }}
+          restore-keys: ${{ runner.os }}-poetry-${{ matrix.package }}-
+      - name: Install deps
+        working-directory: ${{ matrix.package }}
+        run: poetry install --no-interaction
+      - name: Ruff lint
+        working-directory: ${{ matrix.package }}
+        run: poetry run ruff check .
+      - name: Run tests
+        working-directory: ${{ matrix.package }}
+        run: poetry run pytest --tb=short -q

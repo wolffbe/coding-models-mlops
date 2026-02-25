@@ -1,0 +1,29 @@
+apiVersion: serving.kserve.io/v1beta1
+kind: InferenceService
+metadata:
+  name: vllm
+  namespace: mlops
+spec:
+  predictor:
+    model:
+      modelFormat:
+        name: vLLM
+      # storageUri with the hf:// scheme pulls directly from HuggingFace.
+      # Override at deploy time: VLLM_MODEL=org/model make k8s-vllm
+      storageUri: "hf://${VLLM_MODEL}"
+      env:
+        - name: HF_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: mlops-secrets
+              key: HF_TOKEN
+        # Run on CPU (no GPU on macOS minikube). Remove for GPU-enabled clusters.
+        - name: VLLM_TARGET_DEVICE
+          value: cpu
+      resources:
+        requests:
+          cpu: "2"
+          memory: "4Gi"
+        limits:
+          cpu: "4"
+          memory: "8Gi"

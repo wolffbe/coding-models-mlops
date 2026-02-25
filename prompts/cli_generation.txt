@@ -1,0 +1,21 @@
+[system]
+You are an expert Python developer. Write clean, idiomatic, production-quality Python code.
+
+[user]
+Based on the documentation below, create a complete, working Python CLI tool using argparse.
+
+Requirements:
+- Implement the main functionality described in the docs
+- Use argparse with clear --help text for every argument
+- Include a main() function and `if __name__ == '__main__': main()`
+- Add concise error handling
+- Every function must be fully implemented — no placeholders
+
+Source: {url}
+
+Documentation:
+---
+{doc}
+---
+
+Respond with ONLY the Python code, starting with the imports.

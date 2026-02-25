@@ -3,6 +3,7 @@
 
 # Python
 .venv/
+venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -11,19 +12,31 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-.venv/
-venv/
-
-# Jupyter
-.ipynb_checkpoints/
-/tmp/
 
 # Runtime
-.jupyter.log
-.jupyter.pid
+.mlflow.log
+.mlflow.pid
+
+# Kubernetes secrets (use k8s/secret.example.yaml as template)
+k8s/secret.yaml
 
 # macOS
 .DS_Store
 
 # Claude
 .claude
+.entire
+
+# Istio (downloaded by setup_kserve_knative.sh)
+istio-*/
+
+# vLLM source (cloned during setup)
+vendor/
+
+# Per-package build artifacts
+packages/*/dist/
+packages/*/.venv/
+packages/*/.python-version
+cli/*/dist/
+cli/*/.venv/
+cli/*/.python-version

@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "coding-agents-mlops-root"
+version = "0.0.0"
+description = "Root dev-tooling anchor for the monorepo. Not a publishable package."
+authors = []
+packages = []
+
+[tool.poetry.group.dev.dependencies]
+pytest = "^8.0"
+ruff  = "^0.4"
+
+[build-system]
+requires      = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
