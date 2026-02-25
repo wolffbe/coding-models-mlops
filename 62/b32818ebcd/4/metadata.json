@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.4.6",
+  "checkpoint_id": "62b32818ebcd",
+  "session_id": "8b178c82-d211-4fff-a96f-b50395a0b5da",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-25T11:35:26.777378Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "scripts/setup.sh",
+    "scripts/setup_kserve_knative.sh"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "8c311b7ddb4e",
+  "token_usage": {
+    "input_tokens": 5,
+    "cache_creation_tokens": 22137,
+    "cache_read_tokens": 63470,
+    "output_tokens": 183,
+    "api_call_count": 3
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-25T11:35:26.75607Z",
+    "agent_lines": 79,
+    "human_added": 1008,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1087,
+    "agent_percentage": 7.267709291628336
+  }
+}
