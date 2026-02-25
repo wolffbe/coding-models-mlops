@@ -1,0 +1,35 @@
+{
+  "cli_version": "0.4.6",
+  "checkpoint_id": "62b32818ebcd",
+  "session_id": "f3c0ed08-1f32-42fd-8da3-47418ea77e74",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-25T11:35:56.892983Z",
+  "branch": "main",
+  "checkpoints_count": 3,
+  "files_touched": [
+    ".gitignore",
+    "Makefile",
+    "scripts/setup.sh",
+    "scripts/setup_jupyter.sh",
+    "scripts/setup_mlflow.sh",
+    "scripts/setup_vllm.sh"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "866a7d8090f3",
+  "token_usage": {
+    "input_tokens": 133,
+    "cache_creation_tokens": 46845,
+    "cache_read_tokens": 2213385,
+    "output_tokens": 5642,
+    "api_call_count": 52
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-25T11:35:56.732132Z",
+    "agent_lines": 267,
+    "human_added": 820,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1087,
+    "agent_percentage": 24.56301747930083
+  }
+}
