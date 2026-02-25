@@ -3,10 +3,12 @@
   "checkpoint_id": "62b32818ebcd",
   "strategy": "manual-commit",
   "branch": "main",
-  "checkpoints_count": 9,
+  "checkpoints_count": 10,
   "files_touched": [
     ".github/workflows/ci.yml",
     ".gitignore",
+    ".ipynb_checkpoints/generate_cli-checkpoint.ipynb",
+    ".ipynb_checkpoints/notebook-checkpoint.ipynb",
     "Makefile",
     "docker/mlflow/Dockerfile",
     "k8s/configmap.yaml",
@@ -22,6 +24,7 @@
     "pyproject.toml",
     "requirements.txt",
     "scripts/setup.sh",
+    "scripts/setup_jupyter.sh",
     "scripts/setup_kserve_knative.sh",
     "scripts/setup_vllm.sh"
   ],
@@ -32,13 +35,20 @@
       "context": "/62/b32818ebcd/0/context.md",
       "content_hash": "/62/b32818ebcd/0/content_hash.txt",
       "prompt": "/62/b32818ebcd/0/prompt.txt"
+    },
+    {
+      "metadata": "/62/b32818ebcd/1/metadata.json",
+      "transcript": "/62/b32818ebcd/1/full.jsonl",
+      "context": "/62/b32818ebcd/1/context.md",
+      "content_hash": "/62/b32818ebcd/1/content_hash.txt",
+      "prompt": "/62/b32818ebcd/1/prompt.txt"
     }
   ],
   "token_usage": {
-    "input_tokens": 3013,
-    "cache_creation_tokens": 77056,
-    "cache_read_tokens": 4090740,
-    "output_tokens": 23791,
-    "api_call_count": 72
+    "input_tokens": 3040,
+    "cache_creation_tokens": 94456,
+    "cache_read_tokens": 4875628,
+    "output_tokens": 28222,
+    "api_call_count": 97
   }
 }
