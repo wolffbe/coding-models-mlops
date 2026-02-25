@@ -1,0 +1,31 @@
+{
+  "cli_version": "0.4.6",
+  "checkpoint_id": "62b32818ebcd",
+  "session_id": "fdbc1935-062c-4936-b433-405d0b715ea1",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-25T11:36:00.846464Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    "scripts/setup.sh",
+    "scripts/setup_vllm.sh"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "1f31d1b59638",
+  "token_usage": {
+    "input_tokens": 12,
+    "cache_creation_tokens": 19917,
+    "cache_read_tokens": 287267,
+    "output_tokens": 1878,
+    "api_call_count": 10
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-25T11:36:00.817652Z",
+    "agent_lines": 28,
+    "human_added": 1059,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1087,
+    "agent_percentage": 2.5758969641214353
+  }
+}
