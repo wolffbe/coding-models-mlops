@@ -1,0 +1,38 @@
+{
+  "cli_version": "0.4.6",
+  "checkpoint_id": "62b32818ebcd",
+  "session_id": "abf82663-609c-4c05-9fb4-3ca207c2412a",
+  "strategy": "manual-commit",
+  "created_at": "2026-02-25T11:35:37.944836Z",
+  "branch": "main",
+  "checkpoints_count": 1,
+  "files_touched": [
+    ".gitignore",
+    "Makefile",
+    "docker/mlflow/Dockerfile",
+    "k8s/configmap.yaml",
+    "k8s/mlflow/deployment.yaml",
+    "k8s/mlflow/pvc.yaml",
+    "k8s/mlflow/service.yaml",
+    "k8s/namespace.yaml",
+    "k8s/secret.example.yaml"
+  ],
+  "agent": "Claude Code",
+  "turn_id": "a3f7a8a718ab",
+  "token_usage": {
+    "input_tokens": 32,
+    "cache_creation_tokens": 38343,
+    "cache_read_tokens": 907850,
+    "output_tokens": 11443,
+    "api_call_count": 28
+  },
+  "initial_attribution": {
+    "calculated_at": "2026-02-25T11:35:37.763507Z",
+    "agent_lines": 296,
+    "human_added": 791,
+    "human_modified": 0,
+    "human_removed": 0,
+    "total_committed": 1087,
+    "agent_percentage": 27.230910763569455
+  }
+}

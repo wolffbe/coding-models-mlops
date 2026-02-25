@@ -1,0 +1,146 @@
+Implement the following plan:
+
+# Plan: Kubernetes Deployment for Jupyter and MLflow
+
+## Context
+
+The project currently runs Jupyter and MLflow as local background processes managed by `make start/stop`.
+The goal is to containerise both services and deploy them on Kubernetes, supporting:
+- **Local testing**: minikube on the dev laptop
+- **Remote production**: a Proxmox-managed cluster with 4 GPUs
+
+Images will be pushed to a container registry; data will persist via PersistentVolumeClaims.
+
+---
+
+## Architecture
+
+```
+Namespace: mlops
+┌─────────────────────────────────────────────────────────────────┐
+│  Secret: mlops-secrets (HF_TOKEN, ANTHROPIC_API_KEY)            │
+│  ConfigMap: mlops-config (PROVIDER, MODEL, MLFLOW_TRACKING_URI) │
+│                                                                  │
+│  ┌──────────────────────┐    ┌───────────────────────────────┐  │
+│  │  Deployment: jupyter │    │  Deployment: mlflow           │  │
+│  │  Port: 8888          │    │  Port: 5000                   │  │
+│  │  PVC: notebooks-pvc  │    │  PVC: mlflow-pvc              │  │
+│  └──────────┬───────────┘    └──────────────┬────────────────┘  │
+│             │                               │                   │
+│  Service: jupyter (ClusterIP + NodePort)    │                   │
+│             │          Service: mlflow (ClusterIP + NodePort)   │
+└─────────────┴───────────────────────────────┴───────────────────┘
+```
+
+- Jupyter reaches MLflow at `http://mlflow:5000` (Kubernetes DNS)
+- NodePort services work for both minikube (`minikube service`) and the Proxmox cluster (direct node IP)
+- For the remote cluster, NodePort can be swapped to LoadBalancer via a single field change
+
+---
+
+## Files to Create
+
+### Dockerfiles
+
+| File | Base image | Purpose |
+|------|-----------|---------|
+| `docker/jupyter/Dockerfile` | `python:3.11-slim` | Installs `requirements.txt`, starts `jupyter notebook` |
+| `docker/mlflow/Dockerfile` | `python:3.11-slim` | Installs `mlflow`, starts `mlflow server` |
+
+### Kubernetes Manifests (`k8s/`)
+
+```
+k8s/
+├── namespace.yaml
+├── configmap.yaml          # non-secret env vars
+├── secret.example.yaml     # committed template (values are placeholders)
+├── jupyter/
+│   ├── pvc.yaml
+│   ├── deployment.yaml
+│   └── service.yaml
+└── mlflow/
+    ├── pvc.yaml
+    ├── deployment.yaml
+    └── service.yaml
+```
+
+`k8s/secret.yaml` (actual secrets, never committed — added to `.gitignore`)
+
+### Files to Modify
+
+| File | Change |
+|------|--------|
+| `Makefile` | Add `k8s-*` targets (build, push, secret, deploy, delete, forward) |
+| `.gitignore` | Add `k8s/secret.yaml` |
+
+---
+
+## Implementation Details
+
+### Dockerfiles
+
+**`docker/jupyter/Dockerfile`**
+- `COPY requirements.txt` → `pip install`
+- `COPY notebooks/ /home/jovyan/notebooks/`
+- Entrypoint: `jupyter notebook --ip=0.0.0.0 --port=8888 --no-browser --notebook-dir=/home/jovyan/notebooks --NotebookApp.token=''`
+- Volume mount point for PVC: `/home/jovyan/notebooks`
+
+**`docker/mlflow/Dockerfile`**
+- `pip install mlflow`
+- Entrypoint: `mlflow server --host 0.0.0.0 --port 5000`
+- Volume mount point for PVC: `/mlflow`
+- Passes `--backend-store-uri /mlflow/mlruns` and `--default-artifact-root /mlflow/artifacts`
+
+### Kubernetes Manifests
+
+**`k8s/namespace.yaml`** — creates `mlops` namespace
+
+**`k8s/configmap.yaml`** — sets:
+- `PROVIDER=claude`
+- `MODEL=claude-opus-4-6`
+- `MLFLOW_TRACKING_URI=http://mlflow:5000`
+
+**`k8s/secret.example.yaml`** — placeholder values, safe to commit
+
+**`k8s/jupyter/pvc.yaml`** — 2Gi ReadWriteOnce for notebooks
+**`k8s/mlflow/pvc.yaml`** — 5Gi ReadWriteOnce for mlruns + artifacts
+
+**Services** — NodePort for both (works locally via `minikube service` and on the Proxmox cluster via node IP)
+
+**Deployments** — reference the Secret and ConfigMap via `envFrom`
+
+### Makefile Additions
+
+```makefile
+REGISTRY    ?= docker.io/youruser   # override: make k8s-push REGISTRY=...
+K8S_NS      ?= mlops
+
+k8s-build   # docker build both images
+k8s-push    # docker push both images
+k8s-secret  # kubectl create secret from .env (idempotent)
+k8s-deploy  # kubectl apply all manifests (namespace → configmap → secret → pvcs → deployments → services)
+k8s-delete  # kubectl delete all manifests
+k8s-forward # port-forward jupyter:8888 and mlflow:5000 to localhost (for minikube or headless clusters)
+```
+
+---
+
+## Verification
+
+1. `make k8s-build` — both Docker images build without error
+2. `make k8s-secret` — Secret appears in `kubectl get secret -n mlops`
+3. `make k8s-deploy` — all pods reach `Running` state: `kubectl get pods -n mlops`
+4. `make k8s-forward` — Jupyter accessible at http://localhost:8888 and MLflow at http://localhost:5000
+5. Open Jupyter, run `notebooks/0_generate_cli.ipynb` — MLflow run appears at http://localhost:5000
+6. Remote: replace NodePort with LoadBalancer or use `kubectl get svc -n mlops` to find node port
+
+
+If you need specific details from before exiting plan mode (like exact code snippets, error messages, or content you generated), read the full transcript at: /Users/wolffbe/.claude/projects/-Users-wolffbe-workspace-coding-agents-mlops/4f4d9fed-1227-4fb8-bf33-530009651a44.jsonl
+
+---
+
+The system will produce new software packages that I would like to push to my GitHub repository. I would like to use a monorepo for that.
+
+---
+
+[Request interrupted by user for tool use]
